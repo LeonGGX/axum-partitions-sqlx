@@ -1,0 +1,11 @@
+{% extends "base.html.tera" %}
+
+{% block content %}
+<ul>
+    {% for partition in partitions %}
+    <li>
+        <h4 href="partitions/{{ partition.id }}">Titre: {{ partition.title }}/Auteur: {{partition.full_name}}/Genre: {{partition.name}}</h4>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}
