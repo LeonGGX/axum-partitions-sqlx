@@ -32,9 +32,6 @@ use tower::ServiceBuilder;
 use tower_cookies::{CookieManagerLayer, Cookies,};
 use tower_http::services::ServeDir;
 
-use persons::Entity as SeaOrmPerson;
-use genre::Entity as SeaOrmGenre;
-use sea_orm::{prelude::*, Database, Set, Order, QueryOrder};
 use sqlx::PgPool;
 
 use crate::error::AppError;
@@ -64,12 +61,7 @@ async fn main() -> anyhow::Result<()> {
     let host = env::var("HOST").expect("HOST is not set in .env file");
     let port = env::var("PORT").expect("PORT is not set in .env file");
     let server_url = format!("{}:{}", host, port);
-
-    // ici utilisation de SeaOrm
-    let conn = Database::connect(db_url.clone())
-        .await
-        .expect("Database connection failed");
-
+  
     // ici utilisation de sqlx
     let pool = db::create_pg_pool(&db_url).await?;
 
