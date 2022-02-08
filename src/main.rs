@@ -2,9 +2,6 @@
 
 mod db;
 mod flash;
-mod persons;
-mod genre;
-mod partition;
 mod model;
 mod error;
 
@@ -61,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     let host = env::var("HOST").expect("HOST is not set in .env file");
     let port = env::var("PORT").expect("PORT is not set in .env file");
     let server_url = format!("{}:{}", host, port);
-  
+
     // ici utilisation de sqlx
     let pool = db::create_pg_pool(&db_url).await?;
 
@@ -112,7 +109,6 @@ async fn main() -> anyhow::Result<()> {
         .layer(
             ServiceBuilder::new()
                 .layer(CookieManagerLayer::new())
-                .layer(AddExtensionLayer::new(conn))
                 .layer(AddExtensionLayer::new(pool))
                 .layer(AddExtensionLayer::new(templates)));
 
@@ -345,47 +341,39 @@ async fn create_partition (
 
 
 async fn update_genre(
-    Extension(ref conn): Extension<DatabaseConnection>,
+    Extension(ref pool): Extension<PgPool>,
     Path(id): Path<i32>,
-    form: Form<genre::Model>,
+    form: Form<Demande>,
     mut cookies: Cookies,
-)->  Result<GenreResponse, (StatusCode, &'static str)> {
-    let model = form.0;
-    genre::ActiveModel {
-        id: Set(id),
-        name: Set(model.name.to_owned()),
-    }
-        .save(conn)
-        .await
-        .expect("could not edit genre");
+)->  Result<GenreResponse, AppError> {
+
+    let updated_genre = form.0;
+    let genre_name = updated_genre.name;
+
+    let genre = db::update_genre(id, genre_name, pool).await?;
 
     let data = FlashData {
         kind: "success".to_owned(),
-        message: "Genre successfully updated".to_owned(),
+        message: format!("Genre successfully updated : {:?}", genre).to_owned(),
     };
 
     Ok(genre_response(&mut cookies, data))
 }
 
 async fn update_person(
-      Extension(ref conn): Extension<DatabaseConnection>,
+      Extension(ref pool): Extension<PgPool>,
       Path(id): Path<i32>,
-      form: Form<persons::Model>,
+      form: Form<Demande>,
       mut cookies: Cookies,
-)->  Result<PersonResponse, (StatusCode, &'static str)> {
+)->  Result<PersonResponse, AppError> {
 
-    let model = form.0;
-    persons::ActiveModel {
-        id: Set(id),
-        full_name: Set(model.full_name.to_owned()),
-    }
-        .save(conn)
-        .await
-        .expect("could not edit person");
+    let updated_pers = form.0;
+    let person_name = updated_pers.name;
 
+    let person = db::update_person(id,person_name, pool).await?;
     let data = FlashData {
         kind: "success".to_owned(),
-        message: "Person successfully updated".to_owned(),
+        message: format!("Person successfully updated : {:?}", person).to_owned(),
     };
 
     Ok(person_response(&mut cookies, data))
@@ -451,17 +439,33 @@ async fn delete_partition(
 // handlers to print list of rows of table (print to pdf or printer
 //
 
+async fn print_list_persons(
+    Extension(ref templates): Extension<Tera>,
+    Extension(ref pool): Extension<PgPool>,
+    _cookies: Cookies,
+)->  Result<Html<String>, AppError> {
+
+    let persons = db::list_persons(pool).await?;
+    let title = "Liste des Personnes";
+
+    let mut ctx = tera::Context::new();
+    ctx.insert("title", &title);
+    ctx.insert("persons", &persons);
+
+    let body = templates
+        .render("list_users.html.tera", &ctx)
+        .map_err(|err| AppError::Tera(err))?;
+
+    Ok(Html(body))
+}
+
 async fn print_list_genres(
     Extension(ref templates): Extension<Tera>,
-    Extension(ref conn): Extension<DatabaseConnection>,
+    Extension(ref pool): Extension<PgPool>,
     _cookies: Cookies,
-)->  Result<Html<String>, (StatusCode, &'static str)> {
+)->  Result<Html<String>, AppError> {
 
-    let genres = SeaOrmGenre::find()
-        .order_by(genre::Column::Name, Order::Asc)
-        .all(conn)
-        .await
-        .unwrap();
+    let genres = db::list_genres(pool).await?;
 
     let title = "Liste des Genres";
 
@@ -471,35 +475,17 @@ async fn print_list_genres(
 
     let body = templates
         .render("list_genres.html.tera", &ctx)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Template error in list_genres.html.tera"))?;
+        .map_err(|err| AppError::Tera(err))?;
 
     Ok(Html(body))
 }
 
-async fn print_list_persons(
-    Extension(ref templates): Extension<Tera>,
-    Extension(ref conn): Extension<DatabaseConnection>,
-    _cookies: Cookies,
-)->  Result<Html<String>, (StatusCode, &'static str)> {
-    let persons = SeaOrmPerson::find().order_by(persons::Column::FullName, Order::Asc).all(conn).await.unwrap();
-    let title = "Liste des Personnes";
-
-    let mut ctx = tera::Context::new();
-    ctx.insert("title", &title);
-    ctx.insert("persons", &persons);
-
-    let body = templates
-        .render("list_users.html.tera", &ctx)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Template error"))?;
-
-    Ok(Html(body))
-}
 
 async fn print_list_partitions(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
     _cookies: Cookies,
-)->  Result<Html<String>, (StatusCode, &'static str)> {
+)->  Result<Html<String>, AppError> {
 
     let show_partitions = db::list_show_partitions(pool).await.unwrap();
     let title = "liste des partitions";
@@ -510,7 +496,7 @@ async fn print_list_partitions(
 
     let body = templates
         .render("list_partitions.html.tera", &ctx)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Template error in list_partitions.html.tera"))?;
+        .map_err(|err| AppError::Tera(err))?;
 
     Ok(Html(body))
 }
@@ -531,19 +517,17 @@ pub struct Demande {
 ///
 async fn find_genre_by_name(
     Extension(ref templates): Extension<Tera>,
-    Extension(ref conn): Extension<DatabaseConnection>,
+    Extension(ref pool): Extension<PgPool>,
     form: Form<Demande>,
     _cookies: Cookies,
-)->  Result<Html<String>, (StatusCode, &'static str)> {
+)->  Result<Html<String>, AppError> {
 
     let demande = form.0;
     tracing::debug!("name : {:?}", demande);
 
     let name = demande.name;
 
-    let genres: Vec<genre::Model> = SeaOrmGenre::find()
-        .filter(genre::Column::Name.contains(&name))
-        .all(conn).await.unwrap();
+    let genres = db::find_genre_by_name(name, pool).await?;
 
     let title = "Genre(s) trouvé(s)";
 
@@ -553,7 +537,7 @@ async fn find_genre_by_name(
 
     let body = templates
         .render("genres.html.tera", &ctx)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Template error"))?;
+        .map_err(|err| AppError::Tera(err))?;
 
     Ok(Html(body))
 }
@@ -565,21 +549,16 @@ async fn find_genre_by_name(
 ///
 async fn find_person_by_name(
     Extension(ref templates): Extension<Tera>,
-    //Extension(ref conn): Extension<DatabaseConnection>,
     Extension(ref pool): Extension<PgPool>,
     form: Form<Demande>,
     _cookies: Cookies,
-)->  Result<Html<String>, (StatusCode, &'static str)> {
+)->  Result<Html<String>, AppError> {
 
     let demande = form.0;
     tracing::debug!("name : {:?}", demande);
 
     let name = demande.name;
-/*
-    let persons: Vec<persons::Model> = SeaOrmPerson::find()
-        .filter(persons::Column::FullName.contains(&name))
-        .all(conn).await.unwrap();
-*/
+
     let person = db::find_person_by_name(name, pool).await;
     match person {
         Ok(person) => {
@@ -594,7 +573,7 @@ async fn find_person_by_name(
 
             let body = templates
                 .render("persons.html.tera", &ctx)
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Template error"))?;
+                .map_err(|err| AppError::Tera(err))?;
             Ok(Html(body))
         }
         Err(RowNotFound) => {
@@ -603,7 +582,7 @@ async fn find_person_by_name(
 
             let body = templates
                 .render("error/void.html.tera", &ctx)
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Template error"))?;
+                .map_err(|err| AppError::Tera(err))?;
             Ok(Html(body))
         }
     }
