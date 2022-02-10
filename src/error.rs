@@ -1,8 +1,7 @@
 // src/error.rs
 
-use axum::body::{Bytes, Full, HttpBody};
 use axum::http::header::WWW_AUTHENTICATE;
-use axum::http::{HeaderMap, HeaderValue, Response, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
 
@@ -12,7 +11,7 @@ use thiserror::Error;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use tera::Error;
+
 
 
 #[derive(Debug, Error)]

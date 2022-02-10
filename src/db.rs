@@ -1,8 +1,8 @@
 // src/db.rs
 
 use sqlx::postgres::{PgPool, PgRow,};
-use sqlx::{Row, Result, Error};
-use tracing::log::Record;
+use sqlx::{Row, Error};
+
 use crate::model::{Person, ShowPartition, Genre, Partition};
 
 ///
@@ -69,6 +69,7 @@ pub async fn list_show_partitions(pool: &PgPool) -> anyhow::Result<Vec<ShowParti
     ON partitions.person_id = persons.id
     INNER JOIN genres
     ON partitions.genre_id = genres.id
+    ORDER BY partitions.title
         "
         ).map(|row: PgRow| ShowPartition {
             id: row.get(0),
@@ -250,7 +251,10 @@ pub async fn find_partition_by_genre(
     let genre = find_genre_by_name(genre_name.clone(), pool).await?;
     let genre_id = genre.id.unwrap();
 
-    let partitions = sqlx::query("SELECT * FROM partitions WHERE genre_id = $1;")
+    let partitions = sqlx::query(
+        "SELECT * FROM partitions \
+        WHERE genre_id = $1 \
+        ORDER BY partitions.title")
         .bind(genre_id)
         .map(|row: PgRow| Partition {
             id: row.get("id"),
@@ -271,9 +275,12 @@ pub async fn find_partition_by_genre(
 pub async fn find_partition_by_author(author_name: String, pool: &PgPool) -> sqlx::Result<Vec<Partition>> {
 
     let author = find_person_by_name(author_name.clone(), pool).await?;
-    let author_id = author.id;
+    let author_id = author.id.unwrap();
 
-    let partitions = sqlx::query("SELECT * FROM partitions WHERE person_id = $1;")
+    let partitions = sqlx::query(
+        "SELECT * FROM partitions \
+        WHERE person_id = $1\
+        ORDER BY partitions.title")
         .bind(author_id)
         .map(|row: PgRow| Partition {
             id: row.get("id"),
@@ -463,8 +470,43 @@ pub async fn add_partition(
     Ok(partition)
 }
 
-pub async fn update_partition() {
-    todo!()
+pub async fn update_partition(
+    id: i32,
+    partition_title: String,
+    person_id : i32,
+    genre_id: i32,
+    pool: &PgPool,
+) -> sqlx::Result<Partition> {
+
+    let row = sqlx::query!(
+        r#"
+        UPDATE partitions
+        SET title = $1, person_id = $2, genre_id = $3
+        WHERE id = $4
+        RETURNING id, title, person_id, genre_id
+        "#,
+        partition_title,
+        person_id,
+        genre_id,
+        id,
+    )
+ /*       .map(|row: PgRow| Partition {
+            id: row.get(0),
+            title: row.get(1),
+            person_id: row.get(2),
+            genre_id: row.get(3),
+        })*/
+        .fetch_one(pool)
+        .await?;
+    let partition = Partition {
+        id: Some(row.id),
+        title: row.title,
+        person_id: row.person_id,
+        genre_id: row.genre_id.unwrap(),
+    };
+    Ok(partition)
+
+
 }
 
 pub async fn delete_partition(
@@ -483,3 +525,233 @@ pub async fn delete_partition(
 
     Ok(name)
 }
+
+
+
+
+
+
+
+// ************************************************************************************************
+// Get vector with all occurences with same name or title
+/*
+pub async fn get_person_by_name(conn: &DBPool, person_full_name: String) -> QueryResult<Person> {
+    conn.run(move |c|
+        persons::table
+            .filter(full_name.eq(person_full_name))
+            .first(c)
+    ).await
+}
+
+pub async fn get_genre_by_name(conn: &DBPool, genre_name: String) -> QueryResult<Genre> {
+    conn.run(move |c|
+        genres::table
+            .filter(name.eq(genre_name))
+            .first(c)
+    ).await
+}
+
+pub async fn get_raw_partition_by_title(conn: &DBPool, partition_title: String) -> QueryResult<Partition> {
+    conn.run(move |c|
+        partitions::table
+            .filter(title.eq(partition_title))
+            .first(c)
+    ).await
+}
+
+pub async fn get_partition_by_title(
+    conn: &DBPool,
+    partition_title: String,
+) -> QueryResult<ShowPartition> {
+
+    let raw_partition = get_raw_partition_by_title(conn, partition_title.clone()).await;
+    match raw_partition {
+        Ok(..) => {
+            let data = conn.run(|c| {
+                partitions::table
+                    .inner_join(persons::table)
+                    .inner_join(genres::table)
+                    .select((
+                        partitions::id,
+                        partitions::title,
+                        persons::full_name,
+                        genres::name,
+                    ))
+                    .filter(partitions::title.eq(partition_title))
+                    .first(c)
+                    .expect("error")
+            }).await;
+            Ok(data)
+        }
+        Err(e) => Err(e)
+    }
+
+    let data = conn.run(|c| {
+        partitions::table
+            .inner_join(persons::table)
+            .inner_join(genres::table)
+            .select((
+                partitions::id,
+                partitions::title,
+                persons::full_name,
+                genres::name,
+            ))
+            .filter(partitions::title.eq(partition_title))
+            .first(c)
+            .expect("error")
+    }).await;
+    Ok(data)
+}
+
+
+pub async fn get_partition_by_author(
+    conn: &DBPool,
+    partition_author: String,
+) -> QueryResult<Vec<ShowPartition>> {
+    let pers = get_person_by_name(conn, partition_author).await.unwrap();
+
+    let data = conn
+        .run(move |c| {
+            partitions::table
+                .inner_join(persons::table)
+                .inner_join(genres::table)
+                .select((
+                    partitions::id,
+                    partitions::title,
+                    persons::full_name,
+                    genres::name,
+                ))
+                .filter(partitions::person_id.eq(pers.id.unwrap()))
+                .load(c)
+                .expect("error in finding partition by author")
+        })
+        .await;
+    Ok(data)
+}
+
+pub async fn get_partition_by_genre(
+    conn: &DBPool,
+    partition_genre: String,
+) -> QueryResult<Vec<ShowPartition>> {
+    let genre = get_genre_by_name(conn, partition_genre).await.unwrap();
+
+    let data = conn
+        .run(move |c| {
+            partitions::table
+                .inner_join(persons::table)
+                .inner_join(genres::table)
+                .select((
+                    partitions::id,
+                    partitions::title,
+                    persons::full_name,
+                    genres::name,
+                ))
+                .filter(partitions::genre_id.eq(genre.id.unwrap()))
+                .load(c)
+                .expect("error in finding partition by genre")
+        })
+        .await;
+    Ok(data)
+}
+*/
+//*************************************************************************************************
+// DELETE
+/*
+pub async fn delete_one_person(conn: &DBPool, person_id: i32) -> QueryResult<usize> {
+    conn.run(move |c| diesel::delete(persons::table.find(person_id)).execute(c))
+        .await
+}
+
+pub async fn delete_one_genre(conn: &DBPool, genre_id: i32) -> QueryResult<usize> {
+    conn.run(move |c| diesel::delete(genres::table.find(genre_id)).execute(c))
+        .await
+}
+
+pub async fn delete_one_partition(conn: &DBPool, partition_id: i32) -> QueryResult<usize> {
+    conn.run(move |c| diesel::delete(partitions::table.find(partition_id)).execute(c))
+        .await
+}
+*/
+//*************************************************************************************************
+// CREATE
+/*
+pub async fn create_person(conn: &DBPool, person: Person) -> QueryResult<Person> {
+    conn.run(move |c| {
+        diesel::insert_into(persons::table)
+            .values(&person)
+            .get_result(c)
+    })
+        .await
+}
+
+pub async fn create_genre(conn: &DBPool, genre: Genre) -> QueryResult<Genre> {
+    conn.run(move |c| {
+        diesel::insert_into(genres::table)
+            .values(&genre)
+            .get_result(c)
+    })
+        .await
+}
+
+pub async fn create_partition(
+    conn: &DBPool,
+    show_partition: ShowPartition,
+) -> QueryResult<Partition> {
+    let nom = show_partition.full_name.trim();
+
+    let pers = get_person_by_name(conn, nom.to_string()).await?;
+    println!("{:?}", pers);
+    let g = get_genre_by_name(conn, show_partition.name).await?;
+    println!("{:?}", g);
+    let person_id = pers.id.unwrap();
+    let genre_id = g.id.unwrap();
+
+    let partition = Partition {
+        id: None,
+        person_id,
+        title: show_partition.title,
+        genre_id,
+    };
+
+    conn.run(move |c| {
+        diesel::insert_into(partitions::table)
+            .values(&partition)
+            .get_result(c)
+    })
+        .await
+}
+*/
+//******************************************************************************************
+// UPDATE
+/*
+pub async fn update_person(pers_id: i32, person: Person, conn: &DBPool) -> QueryResult<Person> {
+    conn.run(move |c| {
+        diesel::update(persons::table.find(pers_id))
+            .set(&person)
+            .get_result(c)
+    })
+        .await
+}
+
+pub async fn update_genre(genre_id: i32, genre: Genre, conn: &DBPool) -> QueryResult<Genre> {
+    conn.run(move |c| {
+        diesel::update(genres::table.find(genre_id))
+            .set(&genre)
+            .get_result(c)
+    })
+        .await
+}
+
+pub async fn update_partition(
+    part_id: i32,
+    partition: Partition,
+    conn: &DBPool,
+) -> QueryResult<Partition> {
+    conn.run(move |c| {
+        diesel::update(partitions::table.find(part_id))
+            .set(&partition)
+            .get_result(c)
+    })
+        .await
+}
+*/

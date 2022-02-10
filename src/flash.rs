@@ -4,6 +4,12 @@ use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct FlashData {
+    pub(crate) kind: String,
+    pub(crate) message: String,
+}
+
 #[derive(Deserialize)]
 struct ValuedMessage<T> {
     #[serde(rename = "_")]
