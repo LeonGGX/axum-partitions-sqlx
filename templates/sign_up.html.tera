@@ -1,0 +1,34 @@
+
+{% extends "base.html.tera" %}
+{% block content %}
+<p><!--Nothing to see here --></p>
+<div class ="container" id="flash-signup">
+    <h6> Message :
+        {% if flash %}
+        <small class="field-{{ flash.kind }}-flash">
+            {{ flash.message }}
+        </small>
+        {% endif %}
+    </h6>
+</div>
+<p><!--Nothing to see here --></p>
+<form action="/auth/signup" method="post">
+    <div>
+        <label for="user_name">Username:</label>
+        <input type="text" name="user_name">
+    </div>
+    <div>
+        <label for="password">Password:</label>
+        <input type="password" name="password">
+    </div>
+    <div>
+        <select class="form-select form-select-sm" name="role" id="role_select">
+            <option value="">--Choisir un role--</option>
+            <option value="admin">Administrateur</option>
+            <option value="normal">Normal</option>
+            <option value="other">Autre</option>
+        </select>
+    </div>
+    <input type="submit" value="Sign up">
+</form>
+{% endblock %}
