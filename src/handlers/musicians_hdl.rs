@@ -10,7 +10,7 @@ use tower_cookies::{Cookies,};
 use tera::Tera;
 use sqlx::PgPool;
 
-use crate::db::musicians;
+//use crate::db::musicians;
 
 use crate::error::AppError;
 use crate::flash::{
@@ -19,8 +19,11 @@ use crate::flash::{
     PersonResponse,
     FlashData,
 };
-use crate::model::{Person, };
+
 use crate::db::musicians::*;
+
+use axum_macros::debug_handler;
+use crate::models::musician::Person;
 
 
 #[derive(Deserialize, Serialize, Debug, Clone,)]
@@ -38,6 +41,8 @@ pub struct Demande {
 ///
 /// Returns PersonResponse or AppError
 ///
+///
+#[debug_handler]
 pub async fn create_person_hdl(
     Extension(ref pool): Extension<PgPool>,
     form: Form<Person>,
@@ -58,6 +63,7 @@ pub async fn create_person_hdl(
     Ok(person_response(&mut cookies, data))
 }
 
+#[debug_handler]
 pub async fn update_person_hdl(
     Extension(ref pool): Extension<PgPool>,
     Path(id): Path<i32>,
@@ -77,6 +83,7 @@ pub async fn update_person_hdl(
     Ok(person_response(&mut cookies, data))
 }
 
+#[debug_handler]
 pub async fn delete_person_hdl(
     Extension(ref pool): Extension<PgPool>,
     Path(id): Path<i32>,
@@ -102,6 +109,7 @@ pub async fn delete_person_hdl(
 ///
 /// Returns a HTML Page or AppError
 ///
+#[debug_handler]
 pub async fn list_persons_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
@@ -131,6 +139,7 @@ pub async fn list_persons_hdl(
 ///
 /// Returns a HTML Page or AppErro
 ///
+#[debug_handler]
 pub async fn print_list_persons_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
@@ -145,7 +154,7 @@ pub async fn print_list_persons_hdl(
     ctx.insert("persons", &persons);
 
     let body = templates
-        .render("list_users.html.tera", &ctx)
+        .render("list_musicians.html.tera", &ctx)
         .map_err(|err| AppError::Tera(err))?;
 
     Ok(Html(body))
@@ -160,6 +169,7 @@ pub async fn print_list_persons_hdl(
 ///
 /// returns list musicians page with musician found
 ///
+#[debug_handler]
 pub async fn find_person_by_name_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,

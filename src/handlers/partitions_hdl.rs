@@ -25,7 +25,11 @@ use crate::flash::{
     PartitionResponse,
     FlashData,
 };
-use crate::model::{Genre, Person, ShowPartition};
+
+use crate::models::genre::Genre;
+use crate::models::musician::Person;
+use crate::models::partition::ShowPartition;
+
 
 
 #[derive(Deserialize, Serialize, Debug, Clone,)]

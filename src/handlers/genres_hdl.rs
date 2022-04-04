@@ -18,7 +18,7 @@ use crate::flash::{
     GenreResponse,
     FlashData
 };
-use crate::model::{Genre,};
+use crate::models::genre::Genre;
 
 #[derive(Deserialize, Serialize, Debug, Clone,)]
 pub struct Demande {
