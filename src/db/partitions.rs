@@ -2,12 +2,11 @@
 
 use sqlx::{PgPool, Row};
 use sqlx::postgres::PgRow;
-use crate::AppError;
-
-use crate::model::{Partition, ShowPartition};
+//use crate::AppError;
 
 use crate::db::musicians::find_person_by_name;
 use crate::db::genres::find_genre_by_name;
+use crate::models::partition::{Partition, ShowPartition};
 
 //*******************************************************************************************
 // CRUD Operations on partitions

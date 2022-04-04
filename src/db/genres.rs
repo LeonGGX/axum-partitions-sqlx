@@ -2,7 +2,8 @@
 
 use sqlx::{PgPool, Row};
 use sqlx::postgres::PgRow;
-use crate::model::Genre;
+
+use crate::models::genre::Genre;
 
 //*******************************************************************************************
 // CRUD Operations on genres

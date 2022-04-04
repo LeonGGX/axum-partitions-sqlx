@@ -2,7 +2,8 @@
 
 use sqlx::{PgPool, Row};
 use sqlx::postgres::PgRow;
-use crate::model::{Genre, Person};
+
+use crate::models::musician::Person;
 
 //*******************************************************************************************
 // CRUD Operations on persons - musicians
@@ -137,8 +138,8 @@ pub async fn find_person_by_name(
 
 pub async fn list_persons(pool: &PgPool) -> sqlx::Result<Vec<Person>> {
 
-    let mut persons: Vec<Person> = Vec::new();
-    let recs: Vec<Person> =
+    //let mut persons: Vec<Person> = Vec::new();
+    let recs =
         sqlx::query("SELECT id, full_name FROM persons ORDER BY full_name;")
             .map(|row: PgRow| Person {
                 id: row.get("id"),
@@ -146,14 +147,16 @@ pub async fn list_persons(pool: &PgPool) -> sqlx::Result<Vec<Person>> {
             })
             .fetch_all(pool)
             .await?;
-
+/*
     for rec in recs {
         persons.push(Person {
             id: rec.id,
             full_name: rec.full_name,
         });
     }
-    Ok(persons)
+
+ */
+    Ok(recs)
 
     /*
     let persons = sqlx::query_as!(Person,
