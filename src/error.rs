@@ -2,7 +2,7 @@
 
 use axum::http::header::WWW_AUTHENTICATE;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse,};
 use axum::Json;
 
 use sqlx::error::DatabaseError;
@@ -11,8 +11,52 @@ use thiserror::Error;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use serde_json::json;
+use serde_json::{json,};
 
+#[derive(Debug, Error)]
+pub enum MyError {
+    //#[error(transparent)]
+    //BcryptError(#[from] bcrypt::BcryptError),
+    #[error(transparent)]
+    SqlxError(#[from] sqlx::Error),
+    #[error(transparent)]
+    JwtError(#[from] jsonwebtoken::errors::Error),
+    #[error(transparent)]
+    TokioRecvError(#[from] tokio::sync::oneshot::error::RecvError),
+    #[error(transparent)]
+    AxumTypedHeaderError(#[from] axum::extract::rejection::TypedHeaderRejection),
+    #[error(transparent)]
+    AxumExtensionError(#[from] axum::extract::rejection::ExtensionRejection),
+    //#[error(transparent)]
+    //ValidationError(#[from] validator::ValidationErrors),
+    #[error("wrong credentials")]
+    WrongCredentials,
+    #[error("password doesn't match")]
+    WrongPassword,
+    #[error("email is already taken")]
+    DuplicateUserEmail,
+    #[error("name is already taken")]
+    DuplicateUserName,
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+}
+
+/*
+//pub type Result<T> = std::result::Result<T, MyError>;
+pub type ApiError = (StatusCode, Json<Value>);
+
+impl From<MyError> for ApiError {
+    fn from(err: MyError) -> Self {
+        let status = match err {
+            MyError::WrongCredentials => StatusCode::UNAUTHORIZED,
+            //MyError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        let payload = json!({"message": err.to_string()});
+        (status, Json(payload))
+    }
+}
+*/
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -33,7 +77,7 @@ pub enum AppError {
         errors: HashMap<Cow<'static, str>, Vec<Cow<'static, str>>>,
     },
 
-    #[error("Erreur de la base de données")]
+    #[error(transparent)]
     Sqlx( #[from] sqlx::Error),
 
     /// Via the generated `From<anyhow::Error> for Error` impl, this allows the
@@ -41,21 +85,24 @@ pub enum AppError {
     ///
     /// Like with `Error::Sqlx`, the actual error message is not returned to the client
     /// for security reasons.
-    #[error("an internal server error occurred")]
+    #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 
-    #[error("error in Tera template !")]
+    #[error(transparent)]
     Tera(#[from] tera::Error),
 
     // ce qui suit : rajouté pour le système d'autentification JWT
-/*    #[error("wrong credentials")]
-    WrongCredentialsError,
+    #[error("wrong credentials")]
+    WrongCredentials(#[source] anyhow::Error),
+
+    #[error("missing credentials")]
+    MissingCredentials,
 
     #[error("jwt token not valid")]
-    JWTTokenError,
+    InvalidJWTToken,
 
     #[error("jwt token creation error")]
-    JWTTokenCreationError,
+    JWTTokenCreationError(#[from] jsonwebtoken::errors::Error),
 
     #[error("no auth header")]
     NoAuthHeaderError,
@@ -66,15 +113,15 @@ pub enum AppError {
     #[error("no permission")]
     NoPermissionError,
 
- */
-}
+    #[error("Validations error")]
+    ValidationError,
+/*
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+*/
+    #[error("User already exists")]
+    UserExists,
 
-#[derive(Debug)]
-pub enum AuthError {
-    WrongCredentials,
-    MissingCredentials,
-    TokenCreation,
-    InvalidToken,
 }
 
 impl AppError {
@@ -110,14 +157,17 @@ impl AppError {
             Self::UnprocessableEntity { .. } => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Sqlx(_) | Self::Anyhow(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Tera(_) => StatusCode::INTERNAL_SERVER_ERROR,
-/*
-            Self::WrongCredentialsError => StatusCode::FORBIDDEN,
-            Self::JWTTokenError => StatusCode::UNAUTHORIZED,
-            Self::JWTTokenCreationError,
-            Self::NoAuthHeaderError,
-            Self::InvalidAuthHeaderError,
-            Self::NoPermissionError,
-*/
+
+            Self::WrongCredentials(_) => StatusCode::UNAUTHORIZED,
+            Self::MissingCredentials => StatusCode::BAD_REQUEST,
+            Self::JWTTokenCreationError(_) => StatusCode::UNAUTHORIZED,
+            Self::InvalidJWTToken => StatusCode::UNAUTHORIZED,
+            Self::NoAuthHeaderError => StatusCode::BAD_REQUEST,
+            Self::InvalidAuthHeaderError => StatusCode::BAD_REQUEST,
+            Self::NoPermissionError => StatusCode::UNAUTHORIZED,
+            Self::ValidationError => StatusCode::INTERNAL_SERVER_ERROR,
+            //Self::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::UserExists => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -134,7 +184,6 @@ impl IntoResponse for AppError {
     //fn into_response(self) -> Response<Self::Body> {
     //fn into_response(self) -> Response<Full<Bytes>> {
     fn into_response(self) -> axum::response::Response {
-
         match self {
             Self::UnprocessableEntity { errors } => {
                 #[derive(serde::Serialize)]
@@ -174,20 +223,45 @@ impl IntoResponse for AppError {
                 // TODO: we probably want to use `tracing` instead
                 // so that this gets linked to the HTTP request by `TraceLayer`.
                 tracing::error!("Generic error: {:?}", e);
+                return (
+                    self.status_code(),
+                    Json(json!({
+                        "message :" : e.to_string()
+                    }))
+                ).into_response()
             }
 
             Self::Tera(ref e) => {
                 tracing::error!("Tera error : {:?}", e);
+                let body =  Json(json!({
+                        "message :" : e.to_string()
+                    }));
+                return (
+                    self.status_code(),
+                    body
+                ).into_response()
+            }
+
+            Self::JWTTokenCreationError(ref e) => {
+                tracing::error!("Token creation error : {:?}", e);
+                let error_json = json!({"message" : e.to_string()});
+                let body = Json(json!(
+                    error_json
+                ));
+                return (
+                    self.status_code(),
+                    body
+                ).into_response()
             }
 
             // Other errors get mapped normally.
             _ => (),
         }
-
         (self.status_code(), self.to_string()).into_response()
     }
 }
 
+/*
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
@@ -202,7 +276,7 @@ impl IntoResponse for AuthError {
         (status, body).into_response()
     }
 }
-
+*/
 
 pub trait ResultExt<T> {
     /// If `self` contains a SQLx database constraint error with the given name,

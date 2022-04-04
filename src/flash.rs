@@ -1,8 +1,10 @@
 //! src/flash.rs
 
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Redirect};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
+use axum_flash::{Flash,};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct FlashData {
@@ -40,7 +42,9 @@ pub fn get_flash_cookie<T>(cookies: &Cookies) -> Option<T>
 pub type PersonResponse = (StatusCode, HeaderMap);
 pub type GenreResponse = (StatusCode, HeaderMap);
 pub type PartitionResponse = (StatusCode, HeaderMap);
-pub type UserResponse = (StatusCode, HeaderMap);
+//pub type UserResponse = (StatusCode, HeaderMap);
+pub type SignupResponse = (StatusCode, HeaderMap);
+pub type LoginResponse = (StatusCode, HeaderMap);
 
 pub fn person_response<T>(cookies: &mut Cookies, data: T) -> PersonResponse
     where
@@ -99,7 +103,7 @@ pub fn partition_response<T>(cookies: &mut Cookies, data: T) -> PartitionRespons
     (StatusCode::SEE_OTHER, header)
 }
 
-
+/*
 pub fn user_response<T>(cookies: &mut Cookies, data: T) -> UserResponse
     where
         T: Serialize,
@@ -117,4 +121,27 @@ pub fn user_response<T>(cookies: &mut Cookies, data: T) -> UserResponse
     header.insert(header::LOCATION, HeaderValue::from_static("/auth/signup"));
 
     (StatusCode::SEE_OTHER, header)
+}
+
+ */
+
+pub fn signup_response(flash: &mut Flash, message: String) -> SignupResponse {
+    flash.info(message);
+    let mut header = HeaderMap::new();
+    header.insert(header::LOCATION, HeaderValue::from_static("/auth/signup"));
+    //Redirect::to("/auth/signup")
+    (StatusCode::SEE_OTHER, header)
+}
+
+pub fn login_response(flash: &mut Flash, message: String) -> LoginResponse {
+    flash.info(message);
+    let mut header = HeaderMap::new();
+    header.insert(header::LOCATION, HeaderValue::from_static("/auth/login"));
+    //Redirect::to("/auth/signup")
+    (StatusCode::SEE_OTHER, header)
+}
+
+pub fn user_response(flash: &mut Flash, message: String) -> impl IntoResponse {
+    flash.info(message);
+    Redirect::to("/auth/signup")
 }

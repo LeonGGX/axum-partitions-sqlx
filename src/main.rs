@@ -1,7 +1,7 @@
 //! src/main.rs
 
 mod flash;
-mod model;
+mod models;
 mod error;
 mod handlers;
 mod auth;
@@ -12,7 +12,8 @@ mod db;
 use axum::{
     http::{StatusCode,},
     routing::{get_service, },
-    AddExtensionLayer,
+    //AddExtensionLayer,
+    Extension,
 };
 
 use std::{env, net::SocketAddr};
@@ -23,6 +24,7 @@ use tera::Tera;
 use tower::ServiceBuilder;
 use tower_cookies::{CookieManagerLayer,};
 use tower_http::{services::ServeDir, trace::TraceLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::error::AppError;
 
@@ -34,18 +36,23 @@ use crate::db::connect::create_pg_pool;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Set the RUST_LOG, if it hasn't been explicitly defined
-    if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "axum_jwt=debug,tower_http=debug")
-    }
-    tracing_subscriber::fmt::init();
 
-    env::set_var( "JWT_SECRET", "secret");
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG")
+                .unwrap_or_else(|_| "axum_jwt=debug,tower_http=info".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+
+    //env::set_var( "JWT_SECRET", "secret");
 
     dotenv::dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
     let host = env::var("HOST").expect("HOST is not set in .env file");
     let port = env::var("PORT").expect("PORT is not set in .env file");
+    let secret = env::var("JWT_SECRET").expect("JWT_SECRET is not set in .env file");
     let server_url = format!("{}:{}", host, port);
 
     // ici utilisation de sqlx
@@ -73,8 +80,8 @@ async fn main() -> anyhow::Result<()> {
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(CookieManagerLayer::new())
-                .layer(AddExtensionLayer::new(pool))
-                .layer(AddExtensionLayer::new(templates)));
+                .layer(Extension(pool))
+                .layer(Extension(templates)));
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
     tracing::debug!("listening on {}", addr);

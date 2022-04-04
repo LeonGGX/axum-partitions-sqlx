@@ -4,6 +4,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use axum_flash::Key;
 
 use crate::handlers::{
     partitions_hdl::*,
@@ -13,6 +14,7 @@ use crate::handlers::{
     login_hdl::*,
     sign_up_hdl::*,
 };
+use crate::handlers::list_users_hdl::print_list_users_hdl;
 
 pub fn router() -> Router {
     Router::new()
@@ -61,7 +63,12 @@ pub fn partitions_routes() -> Router {
 }
 
 pub fn authentication_routes() -> Router {
+    // axum-flash
+    let key = Key::generate();
     Router::new()
         .route("/signup", get(get_sign_up_hdl).post(sign_up_hdl))
-        //.route("/users", get(list_users-hdl))
+        .route("/login", get(login_form_hdl).post(login_hdl))
+        .route("/users", get(print_list_users_hdl))
+        // axum-flash
+        .layer(axum_flash::layer(key).with_cookie_manager())
 }
