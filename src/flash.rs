@@ -46,6 +46,7 @@ pub type PartitionResponse = (StatusCode, HeaderMap);
 pub type SignupResponse = (StatusCode, HeaderMap);
 pub type LoginResponse = (StatusCode, HeaderMap);
 
+/*
 pub fn person_response<T>(cookies: &mut Cookies, data: T) -> PersonResponse
     where
         T: Serialize,
@@ -64,7 +65,8 @@ pub fn person_response<T>(cookies: &mut Cookies, data: T) -> PersonResponse
 
     (StatusCode::SEE_OTHER, header)
 }
-
+*/
+/*
 pub fn genre_response<T>(cookies: &mut Cookies, data: T) -> GenreResponse
     where
         T: Serialize,
@@ -83,7 +85,8 @@ pub fn genre_response<T>(cookies: &mut Cookies, data: T) -> GenreResponse
 
     (StatusCode::SEE_OTHER, header)
 }
-
+*/
+/*
 pub fn partition_response<T>(cookies: &mut Cookies, data: T) -> PartitionResponse
     where
         T: Serialize,
@@ -102,7 +105,7 @@ pub fn partition_response<T>(cookies: &mut Cookies, data: T) -> PartitionRespons
 
     (StatusCode::SEE_OTHER, header)
 }
-
+*/
 /*
 pub fn user_response<T>(cookies: &mut Cookies, data: T) -> UserResponse
     where
@@ -122,8 +125,31 @@ pub fn user_response<T>(cookies: &mut Cookies, data: T) -> UserResponse
 
     (StatusCode::SEE_OTHER, header)
 }
-
  */
+
+pub fn person_response(flash: &mut Flash, message: String) -> PersonResponse {
+    flash.info(message);
+    let mut header = HeaderMap::new();
+    header.insert(header::LOCATION, HeaderValue::from_static("/persons"));
+    //Redirect::to("/auth/signup")
+    (StatusCode::SEE_OTHER, header)
+}
+
+pub fn genre_response(flash: &mut Flash, message: String) -> GenreResponse {
+    flash.info(message);
+    let mut header = HeaderMap::new();
+    header.insert(header::LOCATION, HeaderValue::from_static("/genres"));
+    //Redirect::to("/auth/signup")
+    (StatusCode::SEE_OTHER, header)
+}
+
+pub fn partition_response(flash: &mut Flash, message: String) -> PartitionResponse {
+    flash.info(message);
+    let mut header = HeaderMap::new();
+    header.insert(header::LOCATION, HeaderValue::from_static("/partitions"));
+
+    (StatusCode::SEE_OTHER, header)
+}
 
 pub fn signup_response(flash: &mut Flash, message: String) -> SignupResponse {
     flash.info(message);

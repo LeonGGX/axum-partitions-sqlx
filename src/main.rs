@@ -18,6 +18,7 @@ use axum::{
 
 use std::{env, net::SocketAddr};
 use std::str::FromStr;
+use axum_flash::Key;
 
 use tera::Tera;
 
@@ -60,6 +61,8 @@ async fn main() -> anyhow::Result<()> {
 
     let templates = Tera::new(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"))
         .expect("Tera initialization failed");
+    // axum-flash
+    let key = Key::generate();
 
     let app =
         router()
@@ -81,7 +84,9 @@ async fn main() -> anyhow::Result<()> {
                 .layer(TraceLayer::new_for_http())
                 .layer(CookieManagerLayer::new())
                 .layer(Extension(pool))
-                .layer(Extension(templates)));
+                .layer(Extension(templates)))
+                // axum-flash
+                .layer(axum_flash::layer(key).with_cookie_manager());
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
     tracing::debug!("listening on {}", addr);

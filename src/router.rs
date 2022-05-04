@@ -64,11 +64,11 @@ pub fn partitions_routes() -> Router {
 
 pub fn authentication_routes() -> Router {
     // axum-flash
-    let key = Key::generate();
+    //let key = Key::generate();
     Router::new()
         .route("/signup", get(get_sign_up_hdl).post(sign_up_hdl))
         .route("/login", get(login_form_hdl).post(login_hdl))
         .route("/users", get(print_list_users_hdl))
         // axum-flash
-        .layer(axum_flash::layer(key).with_cookie_manager())
+       //.layer(axum_flash::layer(key).with_cookie_manager())
 }
