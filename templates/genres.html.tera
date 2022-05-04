@@ -44,15 +44,17 @@
                 </form>
             </div>
         </div>
-        <div class ="container" id="flash-genres">
+        <p><!--Nothing to see here --></p>
+        <div class ="container-fluid bg-primary text-white" id="flash-messages">
             <h6> Message :
                 {% if flash %}
-                <small class="field-{{ flash.kind }}-flash">
-                    {{ flash.message }}
+                <small class="field-{{ flash }}-flash">
+                    {{ flash }}
                 </small>
                 {% endif %}
             </h6>
         </div>
+        <p><!--Nothing to see here --></p>
         <div class ="row" id="print-genres">
             <div class="col-auto">
                 <p><!--Nothing to see here --></p>

@@ -2,23 +2,23 @@
 {% extends "base.html.tera" %}
 {% block content %}
 <p><!--Nothing to see here --></p>
-<div class ="container" id="flash-signup">
+<div class ="container-fluid bg-primary text-white" id="flash-messages">
     <h6> Message :
         {% if flash %}
-        <small class="field-{{ flash.kind }}-flash">
-            {{ flash.message }}
+        <small class="field-{{ flash }}-flash">
+            {{ flash }}
         </small>
         {% endif %}
     </h6>
 </div>
 <p><!--Nothing to see here --></p>
-<form action="/auth/signup" method="post">
+<form action="" method="post">
     <div>
-        <label for="user_name">Username:</label>
-        <input type="text" name="user_name">
+        <label>Entrez le nom d'utilisateur:  </label>
+        <input type="text" name="username">
     </div>
     <div>
-        <label for="password">Password:</label>
+        <label>Entrez le mot de passe : </label>
         <input type="password" name="password">
     </div>
     <div>
