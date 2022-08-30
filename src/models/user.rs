@@ -13,8 +13,8 @@ use unicode_segmentation::UnicodeSegmentation;
 ///
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub struct User {
-    pub user_id: Uuid,
-    pub user_name: String,
+    pub id: Uuid,
+    pub name: String,
     pub password_hash: String,
     pub role: String,
 }
@@ -28,7 +28,7 @@ pub struct User {
 ///
 #[derive(Debug,)]
 pub struct NewUser {
-    pub username: NewUserName,
+    pub name: NewUserName,
     pub password: String,
     pub role: String,
 }

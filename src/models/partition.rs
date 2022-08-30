@@ -18,7 +18,7 @@ pub struct Partition {
 /// une struct pour présenter les partitions avec les
 /// éléments des différentes tables
 ///
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShowPartition {
     #[serde(skip_deserializing)]
     pub id: Option<i32>,
