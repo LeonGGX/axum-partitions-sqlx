@@ -1,6 +1,6 @@
 //! src/db/users.rs
 
-use sqlx::{PgPool, Row};
+use sqlx::{PgPool, Row, /*types::Uuid */};
 use uuid::Uuid;
 use sha3::Digest;
 use sqlx::postgres::PgRow;
@@ -10,26 +10,26 @@ use crate::models::user::{NewUser, User};
 //******************************************************************************************
 // Authentication functions
 //
-pub async fn find_user_by_name(user_name: String, pool: &PgPool) -> sqlx::Result<User>{
+pub async fn find_user_by_name(name: String, pool: &PgPool) -> sqlx::Result<User>{
 
     let row = sqlx::query!(
         r#"
-    SELECT * FROM users WHERE user_name = $1
+    SELECT * FROM users WHERE name = $1
         "#,
-    user_name,
+    name,
     )
         .fetch_one(pool)
         .await?;
     let user = User{
-        user_id: row.user_id,
-        user_name: row.user_name,
+        id: row.id,
+        name: row.name,
         password_hash: row.password_hash,
         role: row.role.unwrap(),
     };
     Ok(user)
 
 }
-
+#[allow(dead_code)]
 pub async fn find_user_by_credentials(user_name: String, user_password : String, pool: &PgPool) -> sqlx::Result<User> {
 
     let password_hash = sha3::Sha3_256::digest(user_password.as_bytes());
@@ -38,7 +38,7 @@ pub async fn find_user_by_credentials(user_name: String, user_password : String,
     let row = sqlx::query!(
         r#"
     SELECT * FROM users
-    WHERE user_name = $1 AND password_hash = $2
+    WHERE name = $1 AND password_hash = $2
         "#,
     user_name,
     password_hash,)
@@ -46,28 +46,28 @@ pub async fn find_user_by_credentials(user_name: String, user_password : String,
         .await?;
 
     let user = User{
-        user_id: row.user_id,
-        user_name: row.user_name,
+        id: row.id,
+        name: row.name,
         password_hash: row.password_hash,
         role: row.role.unwrap(),
     };
     Ok(user)
 }
-
+#[allow(dead_code)]
 pub async fn find_user_by_id(id: Uuid, pool: &PgPool) -> sqlx::Result<User> {
 
     let row = sqlx::query!(
         r#"
     SELECT * FROM users
-    WHERE user_id = $1
+    WHERE id = $1
         "#,
         id,)
         .fetch_one(pool)
         .await?;
 
     let user = User{
-        user_id: row.user_id,
-        user_name: row.user_name,
+        id: row.id,
+        name: row.name,
         password_hash: row.password_hash,
         role: row.role.unwrap(),
     };
@@ -90,12 +90,12 @@ pub async fn add_user(new_user: &NewUser,
 
     let row = sqlx::query!(
             r#"
-            INSERT INTO users (user_id, user_name, password_hash, role)
+            INSERT INTO users (id, name, password_hash, role)
             VALUES ($1, $2, $3, $4)
-            RETURNING user_id, user_name, password_hash, role
+            RETURNING id, name, password_hash, role
             "#,
             uuid,
-            new_user.username.as_ref(),
+            new_user.name.as_ref(),
             new_user.password,
             new_user.role,
         )
@@ -103,8 +103,8 @@ pub async fn add_user(new_user: &NewUser,
         .await?;
 
     let user = User{
-        user_id: row.user_id,
-        user_name: row.user_name,
+        id: row.id,
+        name: row.name,
         password_hash: row.password_hash,
         role: row.role.unwrap(),
     };
@@ -123,8 +123,8 @@ pub async fn list_users(pool: &PgPool) -> sqlx::Result<Vec<User>> {
         r#"SELECT user_id, user_name, password_hash, role FROM users ORDER BY user_name"#
     )
         .map(|row: PgRow| User{
-            user_id: row.get("user_id"),
-            user_name: row.get("user_name"),
+            id: row.get("user_id"),
+            name: row.get("user_name"),
             password_hash: row.get("password_hash"),
             role: row.get("role")
         })
@@ -134,8 +134,8 @@ pub async fn list_users(pool: &PgPool) -> sqlx::Result<Vec<User>> {
     for mut row in rows {
         row.password_hash = pwd.clone();
         list_safe_users.push(User{
-            user_id: row.user_id,
-            user_name: row.user_name,
+            id: row.id,
+            name: row.name,
             password_hash: row.password_hash,
             role: row.role,
         });

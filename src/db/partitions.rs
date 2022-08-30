@@ -89,12 +89,10 @@ pub async fn update_partition(
     let partition = Partition {
         id: Some(row.id),
         title: row.title,
-        person_id: row.person_id,
+        person_id: row.person_id.unwrap(),
         genre_id: row.genre_id.unwrap(),
     };
     Ok(partition)
-
-
 }
 
 pub async fn delete_partition(
@@ -284,5 +282,15 @@ pub async fn find_partition_by_author(author_name: String, pool: &PgPool) -> sql
         &author_name
     );
     Ok(partitions)
+}
+
+pub async fn vec_showpartitions_from_vec_partitions(partitions : Vec<Partition>, pool: &PgPool) -> Vec<ShowPartition>{
+
+    let mut show_partitions: Vec<ShowPartition> = Vec::new();
+    for partition in partitions {
+        let one_show_partition = show_one_partition(partition, pool).await.unwrap();
+        show_partitions.push(one_show_partition);
+    }
+    show_partitions
 }
 
