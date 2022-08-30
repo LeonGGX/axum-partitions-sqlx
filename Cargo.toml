@@ -43,24 +43,8 @@ anyhow = "1.0.53"
 dotenvy = "0.15.1"
 axum-debug = "0.3.2"
 
-
-
-
-
-
-
 axum-macros = "0.2.0"
 axum-flash = "0.4.0"
 axum-extra = {version ="0.3.1", features = ["spa"]}
 rand_core = "0.6.3"
 rand_chacha = "0.3.1"
-#async-sqlx-session = {version = "0.4.0", features = ["pg"]}
-#axum_database_sessions = "2.0.1"
-#axum_database_sessions = { version = "2.0.1", features = [ "postgres", "native-tls"] }
-#axum_sessions_auth = "1.4.0"
-#axum_sessions_auth = { version = "1.4", features = [ "postgres", "native-tls" ] }
-#askama = { version = "0.11.1", features = ["with-axum", "mime", "mime_guess"] }
-#askama_axum = "0.1.0"
-#async-redis-session = "0.2.2"
-#async-session = "3.0.0"
-#askama ="0.11.1"
