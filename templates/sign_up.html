@@ -1,0 +1,30 @@
+
+{% extends "base.html" %}
+{% block content %}
+<p><!--Nothing to see here --></p>
+<div class ="container-fluid bg-primary text-white" id="flash-messages">
+    {% if flash %}
+        {{ flash }}
+    {% endif %}
+</div>
+<p><!--Nothing to see here --></p>
+<form action="" method="post">
+    <div>
+        <label>Entrez le nom d'utilisateur:  </label>
+        <input type="text" name="username">
+    </div>
+    <div>
+        <label>Entrez le mot de passe : </label>
+        <input type="password" name="password">
+    </div>
+    <div>
+        <select class="form-select form-select-sm" name="role" id="role_select">
+            <option value="">--Choisir un role--</option>
+            <option value="admin">Administrateur</option>
+            <option value="normal">Normal</option>
+            <option value="other">Autre</option>
+        </select>
+    </div>
+    <input type="submit" value="Sign up">
+</form>
+{% endblock %}

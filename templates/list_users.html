@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<p><!--Nothing to see here --></p>
+<div class ="container-fluid bg-primary text-white" id="flash-list_users">
+    <h6> Message :
+        {% if flash %}
+        <small class="field-{{ flash.kind }}-flash">
+            {{ flash.message }}
+        </small>
+        {% endif %}
+    </h6>
+</div>
+<p><!--Nothing to see here --></p>
+<div>
+    <table class="table">
+        <thead class="thead-light">
+        <tr>
+            <th>Nom d'utilisateur</th>
+            <th>Rôle</th>
+        </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.user_name }}</td>
+                <td>{{ user.role }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock content %}

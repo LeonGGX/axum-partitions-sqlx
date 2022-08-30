@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<p><!--Nothing to see here --></p>
+<div class ="container-fluid bg-primary text-white" id="flash-messages">
+    <h6> Message :
+        {% if flash %}
+        <small class="field-{{ flash }}-flash">
+            {{ flash }}
+        </small>
+        {% endif %}
+    </h6>
+</div>
+<p><!--Nothing to see here --></p>
+<form action="/auth/login" method="post">
+    <div>
+        <label>Username:
+            <input type="text" name="username">
+        </label>
+    </div>
+    <div>
+        <label>Password:
+            <input type="password" name="password">
+        </label>
+    </div>
+    <button type="submit">Login</button>
+</form>
+{% endblock %}
