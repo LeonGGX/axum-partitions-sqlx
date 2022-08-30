@@ -11,10 +11,13 @@ use axum::{
     headers::{authorization::Bearer, Authorization},
     async_trait,
 };
+//use headers::HeaderMap;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+//use lazy_static::lazy_static;
+//use secrecy::Secret;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
-
+//use crate::db;
 use crate::error::AppError;
 
 ///
@@ -46,6 +49,7 @@ pub struct AuthBody {
 }
 
 impl AuthBody {
+    #[allow(dead_code)]
     pub fn new(access_token: String) -> Self {
         Self {
             access_token,
@@ -53,6 +57,9 @@ impl AuthBody {
         }
     }
 }
+
+
+
 
 #[derive(Debug, Deserialize)]
 pub struct SignInPayload {
@@ -69,6 +76,7 @@ pub struct Claims {
 }
 
 impl Claims {
+    #[allow(dead_code)]
     pub fn new(id: Uuid) -> Self {
         let username = "".to_string();
         let iat = Utc::now();
@@ -155,7 +163,7 @@ pub async fn verify_password(entered_password: String, stored_password_hash: Str
         .context("panic in verifying password hash")??)
 }
 
-
+#[allow(dead_code)]
 pub fn generate_jwt(claims: &Claims) -> anyhow::Result<String> {
     encode(
         &Header::default(),
@@ -165,7 +173,7 @@ pub fn generate_jwt(claims: &Claims) -> anyhow::Result<String> {
     )
         .map_err(|e| anyhow::anyhow!(e))
 }
-
+#[allow(dead_code)]
 pub fn sign_jwt(id: Uuid) -> anyhow::Result<String> {
     Ok(jsonwebtoken::encode(
         &Header::default(),
@@ -175,6 +183,7 @@ pub fn sign_jwt(id: Uuid) -> anyhow::Result<String> {
     )?)
 }
 
+#[allow(dead_code)]
 pub fn verify_jwt(token: &str) -> anyhow::Result<Claims> {
     jsonwebtoken::decode(
         token,
@@ -185,3 +194,42 @@ pub fn verify_jwt(token: &str) -> anyhow::Result<Claims> {
         .map(|data| data.claims)
         .map_err(|e| anyhow::anyhow!(e))
 }
+
+/*
+///
+/// Returns AuthPayload with username and password
+/// under the form 'client_name' and 'client_secret'
+///
+pub async fn basic_authentication(headers: &HeaderMap) -> Result<LoginPayload, anyhow::Error> {
+    // The header value, if present, must be a valid UTF8 string
+    let header_value = headers
+        .get("Authorization")
+        .context("The 'Authorization' header was missing")?
+        .to_str()
+        .context("The 'Authorization' header was not a valid UTF8 string.")?;
+
+    let base64encoded_segment = header_value
+        .strip_prefix("Basic ")
+        .context("The authorization scheme was not 'Basic'.")?;
+    let decoded_bytes = base64::decode_config(base64encoded_segment, base64::STANDARD)
+        .context("Failed to base64-decode 'Basic' credentials.")?;
+    let decoded_credentials = String::from_utf8(decoded_bytes)
+        .context("The decoded credential string is not valid UTF8.")?;
+
+    // Split into two segments, using ':' as delimitator
+    let mut credentials = decoded_credentials.splitn(2, ':');
+    let username = credentials
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("A username must be provided in 'Basic' auth."))?
+        .to_string();
+    let password = credentials
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("A password must be provided in 'Basic' auth."))?
+        .to_string();
+
+    Ok(LoginPayload {
+        user_name: username,
+        password,
+    })
+}
+*/

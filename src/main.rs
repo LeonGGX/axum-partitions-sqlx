@@ -7,33 +7,38 @@ mod handlers;
 mod auth;
 mod router;
 mod db;
+//mod my_askama;
+mod globals;
 
 
 use axum::{
     http::{StatusCode,},
-    routing::{get_service, },
-    //AddExtensionLayer,
     Extension,
 };
+use axum_flash::Key;
+
+//use axum_database_sessions::{AxumSession, AxumSessionConfig, AxumSessionLayer, AxumDatabasePool};
+//use axum_sessions_auth::{AuthSession, AuthSessionLayer, Authentication};
 
 use std::{env, net::SocketAddr};
 use std::str::FromStr;
-use axum_flash::Key;
+use std::sync::Arc;
+use rand_chacha::ChaCha8Rng;
+use rand_core::{OsRng, RngCore, SeedableRng};
 
 use tera::Tera;
+use tokio::sync::Mutex;
 
-use tower::ServiceBuilder;
+use tower::{ServiceBuilder,};
 use tower_cookies::{CookieManagerLayer,};
-use tower_http::{services::ServeDir, trace::TraceLayer};
+use tower_http::{trace::TraceLayer, };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::error::AppError;
-
 use crate::handlers::helpers_hdl::*;
-
 use crate::router::router;
-
 use crate::db::connect::create_pg_pool;
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -46,47 +51,43 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-
-    //env::set_var( "JWT_SECRET", "secret");
-
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
     let host = env::var("HOST").expect("HOST is not set in .env file");
     let port = env::var("PORT").expect("PORT is not set in .env file");
-    let secret = env::var("JWT_SECRET").expect("JWT_SECRET is not set in .env file");
     let server_url = format!("{}:{}", host, port);
+
 
     // ici utilisation de sqlx
     let pool = create_pg_pool(&db_url).await?;
 
-    let templates = Tera::new(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"))
-        .expect("Tera initialization failed");
+    // Tera templates
+    let templates = match Tera::new("templates/**/*.html") {
+        Ok(t) => t,
+        Err(e) => {
+            println!("Parsing error(s): {}", e);
+            ::std::process::exit(1);
+        }
+    };
+
     // axum-flash
     let key = Key::generate();
 
+    // pour les sessions
+    let random = rand_chacha::ChaCha8Rng::seed_from_u64(OsRng.next_u64());
+
     let app =
+        // fonction qui vient de 'router.rs' et qui construit toutes les routes
         router()
-        .nest(
-            "/static",
-                get_service(ServeDir::new(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/static"
-                )))
-                    .handle_error(|error: std::io::Error| async move {
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Unhandled internal error: {}", error),
-                        )
-                    }),
-        )
         .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(CookieManagerLayer::new())
-                .layer(Extension(pool))
-                .layer(Extension(templates)))
-                // axum-flash
-                .layer(axum_flash::layer(key).with_cookie_manager());
+                ServiceBuilder::new()
+                    .layer(TraceLayer::new_for_http())
+                    .layer(CookieManagerLayer::new())
+                    .layer(Extension(pool))
+                    .layer(Extension(templates)))
+                    // axum-flash
+                    .layer(axum_flash::layer(key).with_cookie_manager())
+                    .layer(Extension(Arc::new(Mutex::new(random))));
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
     tracing::debug!("listening on {}", addr);
@@ -98,6 +99,8 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+
 
 
 

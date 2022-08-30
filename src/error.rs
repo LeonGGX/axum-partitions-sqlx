@@ -5,8 +5,6 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse,};
 use axum::Json;
 
-use sqlx::error::DatabaseError;
-
 use thiserror::Error;
 
 use std::borrow::Cow;
@@ -42,7 +40,7 @@ pub enum MyError {
 }
 
 /*
-//pub type Result<T> = std::result::Result<T, MyError>;
+pub type Result<T> = std::result::Result<T, MyError>;
 pub type ApiError = (StatusCode, Json<Value>);
 
 impl From<MyError> for ApiError {
@@ -109,19 +107,19 @@ pub enum AppError {
 
     #[error("invalid auth header")]
     InvalidAuthHeaderError,
-
+/*
     #[error("no permission")]
     NoPermissionError,
-
+*/
     #[error("Validations error")]
     ValidationError,
 /*
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
-*/
+
     #[error("User already exists")]
     UserExists,
-
+*/
 }
 
 impl AppError {
@@ -131,6 +129,8 @@ impl AppError {
     /// Multiple for the same key are collected into a list for that key.
     ///
     /// Try "Go to Usage" in an IDE for examples.
+    ///
+    #[allow(dead_code)]
     pub fn unprocessable_entity<K, V>(errors: impl IntoIterator<Item = (K, V)>) -> Self
         where
             K: Into<Cow<'static, str>>,
@@ -164,10 +164,10 @@ impl AppError {
             Self::InvalidJWTToken => StatusCode::UNAUTHORIZED,
             Self::NoAuthHeaderError => StatusCode::BAD_REQUEST,
             Self::InvalidAuthHeaderError => StatusCode::BAD_REQUEST,
-            Self::NoPermissionError => StatusCode::UNAUTHORIZED,
+            //Self::NoPermissionError => StatusCode::UNAUTHORIZED,
             Self::ValidationError => StatusCode::INTERNAL_SERVER_ERROR,
             //Self::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::UserExists => StatusCode::INTERNAL_SERVER_ERROR,
+            //Self::UserExists => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -178,11 +178,6 @@ impl AppError {
 /// By default, the generated `Display` impl is used to return a plaintext error message
 /// to the client.
 impl IntoResponse for AppError {
-    //type Body = Full<Bytes>;
-    //type BodyError = <Full<Bytes> as HttpBody>::Error;
-
-    //fn into_response(self) -> Response<Self::Body> {
-    //fn into_response(self) -> Response<Full<Bytes>> {
     fn into_response(self) -> axum::response::Response {
         match self {
             Self::UnprocessableEntity { errors } => {
@@ -217,6 +212,13 @@ impl IntoResponse for AppError {
                 // TODO: we probably want to use `tracing` instead
                 // so that this gets linked to the HTTP request by `TraceLayer`.
                 tracing::error!("SQLx error: {:?}", e);
+                let body = Json(json!({
+                        "message :" : e.to_string()
+                    }));
+                return(
+                    self.status_code(),
+                    body
+                ).into_response();
             }
 
             Self::Anyhow(ref e) => {
@@ -260,7 +262,15 @@ impl IntoResponse for AppError {
         (self.status_code(), self.to_string()).into_response()
     }
 }
-
+/*
+/// This makes it possible to use `?` to automatically convert a `UserRepoError`
+/// into an `AppError`.
+impl From<UserRepoError> for AppError {
+    fn from(inner: UserRepoError) -> Self {
+        AppError::UserRepo(inner)
+    }
+}
+*/
 /*
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
@@ -277,7 +287,7 @@ impl IntoResponse for AuthError {
     }
 }
 */
-
+/*
 pub trait ResultExt<T> {
     /// If `self` contains a SQLx database constraint error with the given name,
     /// transform the error.
@@ -307,3 +317,4 @@ impl<T, E> ResultExt<T> for Result<T, E>
         })
     }
 }
+*/
