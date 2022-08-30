@@ -24,7 +24,7 @@ pub async fn print_list_users_hdl(Extension(ref templates): Extension<Tera>,
     ctx.insert("users", &users);
 
     let body = templates
-        .render("list_users.html.tera", &ctx)
+        .render("list_users.html", &ctx)
         .map_err(|err| AppError::Tera(err))?;
 
     Ok(Html(body))

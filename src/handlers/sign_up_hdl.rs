@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use axum::extract::{Extension, Form};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, /*IntoResponse,*/};
 use axum_flash::{Flash, IncomingFlashes};
 
@@ -12,7 +13,7 @@ use tera::Tera;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::error::AppError;
-use crate::flash::{signup_response, SignupResponse};
+use crate::flash::{signup_response,};
 use crate::models::user::{NewUser, NewUserName};
 use crate::{auth, db,};
 
@@ -51,7 +52,7 @@ impl TryFrom<RegisterRequest> for NewUser {
 ///
 #[debug_handler]
 pub async fn get_sign_up_hdl(
-    Extension(ref templates): Extension<Tera>,
+    templates: Extension<Tera>,
     flash: IncomingFlashes) -> Result<Html<String>, AppError > {
 
     let flash = flash
@@ -69,7 +70,7 @@ pub async fn get_sign_up_hdl(
     ctx.insert("flash", &flash);
 
     let body = templates
-        .render("sign_up.html.tera", &ctx)
+        .render("sign_up.html", &ctx)
         .map_err(|e| AppError::Tera(e))?;
 
     Ok(Html(body))
@@ -81,10 +82,10 @@ pub async fn get_sign_up_hdl(
 ///
 #[debug_handler]
 pub async fn sign_up_hdl(
-    Extension(ref pool): Extension<PgPool>,
+    pool: Extension<PgPool>,
     form: Form<RegisterRequest>,
     mut flash: Flash,
-) -> Result<SignupResponse, AppError> {
+) -> Result<(StatusCode, HeaderMap), AppError> {
 
     // on vérife si les données du formulaire sont remplies
     if form.username.is_empty() {
@@ -106,24 +107,24 @@ pub async fn sign_up_hdl(
     // on ajoute le nouvel utilisateur à la DB
     // on renvoie vers la page signup avec le message de création du nouvel utilisateur
     if let Ok(name) = parse(&form.username) {
-        if let Ok(user) = db::users::find_user_by_name(name, pool).await {
-            let message = format!("L'utilisateur {:?} existe déjà !", user.user_name);
+        if let Ok(user) = db::users::find_user_by_name(name, &pool).await {
+            let message = format!("L'utilisateur {:?} existe déjà !", user.name);
             Ok(signup_response(&mut flash, message))
             //return Err(AppError::UserExists);
         }
         else {
-            let username = NewUserName::parse(form.username.clone()).unwrap();
+            let name = NewUserName::parse(form.username.clone()).unwrap();
             // fonction de hash ici
             let password = auth::hash_password(form.password.clone()).await.unwrap();
             // *********************
             let new_user = NewUser{
-                username,
+                name,
                 password,
                 role: form.role.clone(),
             };
-            let added_user = db::users::add_user(&new_user, pool).await.unwrap();
+            let added_user = db::users::add_user(&new_user, &pool).await.unwrap();
             tracing::info!("user added : {:?}", added_user);
-            let message = format!("Nouvel utilisateur ajouté : {}", added_user.user_name);
+            let message = format!("Nouvel utilisateur ajouté : {}", added_user.name);
             return Ok(signup_response(&mut flash, message));
         }
 

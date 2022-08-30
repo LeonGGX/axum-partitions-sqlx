@@ -1,10 +1,11 @@
 //! src/handlers/partitions_hdl.rs
 
 use axum::extract::{Extension, Form, Path};
-use axum::http::{StatusCode,};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::Html;
+use axum_flash::{Flash, IncomingFlashes};
 
-use tower_cookies::{Cookies,};
+//use tower_cookies::{Cookies,};
 
 use tera::Tera;
 use sqlx::PgPool;
@@ -19,13 +20,8 @@ use crate::db::{
 };
 
 use crate::error::AppError;
-use crate::flash::{
-    get_flash_cookie,
-    partition_response,
-    PartitionResponse,
-    FlashData,
-};
-
+use crate::flash::partition_response;
+use crate::globals::{get_static_vec_partitions, set_static_vec_partitions};
 use crate::models::genre::Genre;
 use crate::models::musician::Person;
 use crate::models::partition::ShowPartition;
@@ -48,10 +44,11 @@ pub struct Demande {
 /// Returns PartitionResponse or AppError
 ///
 pub async fn create_partition_hdl (
-    Extension(ref pool): Extension<PgPool>,
+    //Extension(ref pool): Extension<PgPool>,
+    pool: Extension<PgPool>,
     form: Form<ShowPartition>,
-    mut cookies: Cookies,
-)-> Result<PartitionResponse, (StatusCode, &'static str)> {
+    mut flash: Flash,
+)-> Result<(StatusCode, HeaderMap), (StatusCode, &'static str)> {
 
     let show_partition = form.0;
 
@@ -60,28 +57,18 @@ pub async fn create_partition_hdl (
     let title = show_partition.title.clone();
 
     let new_partition =
-        add_partition(title,person_name, genre_name, pool).await;
+        add_partition(title,person_name, genre_name, &pool).await;
 
     match new_partition {
         Ok(new_partition) => {
             tracing::info!("nouvelle partition : {:?}", new_partition);
 
             let message = format!("Partition ajoutée : {}", new_partition.title);
-
-            let data = FlashData {
-                kind: "success".to_owned(),
-                message: message.to_owned(),
-            };
-            Ok(partition_response(&mut cookies, data))
+            Ok(partition_response(&mut flash, message))
         }
         Err(_) => {
             let message = format!("Erreur : Partition pas ajoutée !");
-
-            let data = FlashData {
-                kind: "error".to_owned(),
-                message: message.to_owned(),
-            };
-            Ok(partition_response(&mut cookies, data))
+            Ok(partition_response(&mut flash, message))
         }
     }
 }
@@ -91,8 +78,8 @@ pub async fn update_partition_hdl(
     Extension(ref pool): Extension<PgPool>,
     Path(id): Path<i32>,
     form: Form<ShowPartition>,
-    mut cookies: Cookies,
-)->  Result<PartitionResponse, AppError> {
+    mut flash: Flash,
+)->  Result<(StatusCode, HeaderMap), AppError> {
 
     let show_partition = form.0;
 
@@ -105,30 +92,22 @@ pub async fn update_partition_hdl(
     let title = show_partition.title;
 
     let partition_changed = update_partition(id, title, person_id, genre_id, pool).await?;
-    let data = FlashData {
-        kind: "success".to_owned(),
-        message: format!("Partition successfully updated : {:?}", partition_changed).to_owned(),
-    };
 
-    Ok(partition_response(&mut cookies, data))
-
+    let message = format!("Partition successfully updated : {:?}", partition_changed).to_owned();
+    Ok(partition_response(&mut flash, message))
 }
 
 
 pub async fn delete_partition_hdl(
     Extension(ref pool): Extension<PgPool>,
     Path(id): Path<i32>,
-    mut cookies: Cookies,
-) -> Result<PartitionResponse, AppError>  {
+    mut flash: Flash,
+) -> Result<(StatusCode, HeaderMap), AppError>  {
 
     let partition_title = delete_partition(id, pool).await?;
+    let message = format!("Partition succcessfully deleted : {}", partition_title).to_owned();
 
-    let data = FlashData {
-        kind: "success".to_owned(),
-        message: format!("Partition succcessfully deleted : {}", partition_title).to_owned(),
-    };
-
-    Ok(partition_response(&mut cookies, data))
+    Ok(partition_response(&mut flash, message))
 }
 
 //*******************************************************************************
@@ -143,10 +122,20 @@ pub async fn delete_partition_hdl(
 pub async fn list_partitions_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
-    cookies: Cookies,)
+    flash: IncomingFlashes,)
     ->  Result<Html<String>, AppError> {
 
-    let show_partitions = list_show_partitions(pool).await?;
+    let flash = flash
+        .into_iter()
+        .map(|(level, text)| format!("{:?}: {}", level, text))
+        .collect::<Vec<_>>()
+        .join(", ");
+    tracing::info!("flash : {}", flash);
+
+    //let show_partitions = list_show_partitions(pool).await?;
+    set_static_vec_partitions(list_show_partitions(pool).await?);
+    let show_partitions = get_static_vec_partitions();
+
     let persons = list_persons(pool).await?;
     let genres = list_genres(pool).await?;
     let title = "Gestion des Partitions";
@@ -156,13 +145,10 @@ pub async fn list_partitions_hdl(
     ctx.insert("persons", &persons);
     ctx.insert("genres", &genres);
     ctx.insert("partitions", &show_partitions);
-
-    if let Some(value) = get_flash_cookie::<FlashData>(&cookies) {
-        ctx.insert("flash", &value);
-    }
+    ctx.insert("flash", &flash);
 
     let body = templates
-        .render("partitions.html.tera", &ctx)
+        .render("partitions.html", &ctx)
         .map_err(|e| AppError::Tera(e))?;
 
     Ok(Html(body))
@@ -177,10 +163,11 @@ pub async fn list_partitions_hdl(
 pub async fn print_list_partitions_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
-    _cookies: Cookies,
 )->  Result<Html<String>, AppError> {
 
-    let show_partitions = list_show_partitions(pool).await.unwrap();
+    //let show_partitions = list_show_partitions(pool).await.unwrap();
+    let show_partitions = get_static_vec_partitions();
+
     let title = "liste des partitions";
 
     let mut ctx = tera::Context::new();
@@ -188,7 +175,7 @@ pub async fn print_list_partitions_hdl(
     ctx.insert("partitions", &show_partitions);
 
     let body = templates
-        .render("list_partitions.html.tera", &ctx)
+        .render("list_partitions.html", &ctx)
         .map_err(|err| AppError::Tera(err))?;
 
     Ok(Html(body))
@@ -207,8 +194,15 @@ pub async fn find_partition_title_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
     form: Form<Demande>,
-    _cookies: Cookies,
+    flash: IncomingFlashes,
 )->  Result<Html<String>, AppError> {
+
+    let flash = flash
+        .into_iter()
+        .map(|(level, text)| format!("{:?}: {}", level, text))
+        .collect::<Vec<_>>()
+        .join(", ");
+    tracing::info!("flash : {}", flash);
 
     let demande = form.0;
     let name = demande.name;
@@ -216,12 +210,16 @@ pub async fn find_partition_title_hdl(
     if let Ok(partitions) = find_partition_by_title(name, pool).await {
 
         let title = "Partition(s) trouvée(s)";
-
+/*
         let mut show_partitions: Vec<ShowPartition> = Vec::new();
         for partition in partitions {
             let one_show_partition = show_one_partition(partition, pool).await.unwrap();
             show_partitions.push(one_show_partition);
         }
+*/
+        let sh_partitions = vec_showpartitions_from_vec_partitions(partitions, pool).await;
+        set_static_vec_partitions(sh_partitions);
+        let show_partitions = get_static_vec_partitions();
 
         let persons = list_persons(pool).await?;
         let genres = list_genres(pool).await?;
@@ -233,7 +231,7 @@ pub async fn find_partition_title_hdl(
         ctx.insert("persons", &persons);
 
         let body = templates
-            .render("partitions.html.tera", &ctx)
+            .render("partitions.html", &ctx)
             .map_err(|err| AppError::Tera(err))?;
         Ok(Html(body))
     }
@@ -252,7 +250,7 @@ pub async fn find_partition_genre_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
     form: Form<Genre>,
-    _cookies: Cookies,) -> Result<Html<String>, AppError> {
+   ) -> Result<Html<String>, AppError> {
 
     let genre = form.0;
     let name = genre.name;
@@ -275,7 +273,7 @@ pub async fn find_partition_genre_hdl(
     ctx.insert("persons", &persons);
 
     let body = templates
-        .render("partitions.html.tera", &ctx)
+        .render("partitions.html", &ctx)
         .map_err(|err| AppError::Tera(err))?;
     Ok(Html(body))
 
@@ -285,7 +283,7 @@ pub async fn find_partition_author_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
     form: Form<Person>,
-    _cookies: Cookies,) -> Result<Html<String>, AppError>{
+   ) -> Result<Html<String>, AppError>{
 
     let person = form.0;
     let name = person.full_name;
@@ -298,6 +296,9 @@ pub async fn find_partition_author_hdl(
         let show_part = show_one_partition(partition, pool).await?;
         show_partitions.push(show_part);
     }
+    set_static_vec_partitions(show_partitions);
+    let show_partitions = get_static_vec_partitions();
+
     let persons = list_persons(pool).await?;
     let genres = list_genres(pool).await?;
 
@@ -308,7 +309,7 @@ pub async fn find_partition_author_hdl(
     ctx.insert("persons", &persons);
 
     let body = templates
-        .render("partitions.html.tera", &ctx)
+        .render("partitions.html", &ctx)
         .map_err(|err| AppError::Tera(err))?;
 
     Ok(Html(body))

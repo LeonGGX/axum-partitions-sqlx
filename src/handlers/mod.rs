@@ -1,4 +1,4 @@
-//!src/handlers/db
+//!src/handlers/mod.rs
 
 pub mod musicians_hdl;
 pub mod genres_hdl;
