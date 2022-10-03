@@ -1,6 +1,6 @@
 //! src/db/db
-pub mod users;
-pub mod musicians;
-pub mod genres;
-pub mod partitions;
 pub mod connect;
+pub mod genres;
+pub mod musicians;
+pub mod partitions;
+pub mod users;
