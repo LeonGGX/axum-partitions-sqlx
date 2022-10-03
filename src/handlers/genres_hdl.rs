@@ -5,22 +5,21 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::Html;
 use axum_flash::{Flash, IncomingFlashes};
 
-use tera::Tera;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use serde::{Serialize, Deserialize,};
+use tera::Tera;
 
 use crate::db::genres::*;
 
 use crate::error::AppError;
-use crate::flash::{ genre_response,};
+use crate::flash::genre_response;
 use crate::globals::{get_static_vec_genres, set_static_vec_genres};
 use crate::models::genre::Genre;
 
-#[derive(Deserialize, Serialize, Debug, Clone,)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Demande {
-    pub name : String,
+    pub name: String,
 }
-
 
 //***********************************************************************************
 // CRUD Operations
@@ -38,8 +37,7 @@ pub async fn create_genre_hdl(
     form: Form<Genre>,
     mut flash: Flash,
     //mut cookies: Cookies,
-)-> Result<(StatusCode, HeaderMap), AppError> {
-
+) -> Result<(StatusCode, HeaderMap), AppError> {
     let genre = form.0;
     let new_genre = add_genre(pool, genre).await?;
     let message = format!("Genre ajouté : {}", new_genre.name);
@@ -53,12 +51,11 @@ pub async fn update_genre_hdl(
     form: Form<Demande>,
     mut flash: Flash,
     //mut cookies: Cookies,
-)->  Result<(StatusCode, HeaderMap), AppError> {
-
+) -> Result<(StatusCode, HeaderMap), AppError> {
     let updated_genre = form.0;
     let genre_name = updated_genre.name;
     let genre = update_genre(id, genre_name, pool).await?;
-    let  message= format!("Genre modifié avec succès : {:?}", genre.name).to_owned();
+    let message = format!("Genre modifié avec succès : {:?}", genre.name).to_owned();
     Ok(genre_response(&mut flash, message))
 }
 
@@ -67,9 +64,8 @@ pub async fn delete_genre_hdl(
     Path(id): Path<i32>,
     mut flash: Flash,
 ) -> Result<(StatusCode, HeaderMap), AppError> {
-
     let genre_nom = delete_genre(id, pool).await?;
-    let message= format!("Genre effacé : {}", genre_nom).to_owned();
+    let message = format!("Genre effacé : {}", genre_nom).to_owned();
 
     Ok(genre_response(&mut flash, message))
 }
@@ -83,11 +79,11 @@ pub async fn delete_genre_hdl(
 ///
 /// Returns a HTML Page or AppError
 ///
-pub async fn list_genres_hdl(Extension(ref templates): Extension<Tera>,
-                             Extension(ref pool): Extension<PgPool>,
-                             flash: IncomingFlashes,
-)->  Result<Html<String>, AppError> {
-
+pub async fn list_genres_hdl(
+    Extension(ref templates): Extension<Tera>,
+    Extension(ref pool): Extension<PgPool>,
+    flash: IncomingFlashes,
+) -> Result<Html<String>, AppError> {
     let flash = flash
         .into_iter()
         .map(|(level, text)| format!("{:?}: {}", level, text))
@@ -119,10 +115,11 @@ pub async fn list_genres_hdl(Extension(ref templates): Extension<Tera>,
 /// Returns a HTML Page or AppError
 ///
 pub async fn print_list_genres_hdl(
-    Extension(ref templates): Extension<Tera>,
-    Extension(ref pool): Extension<PgPool>,
-)->  Result<Html<String>, AppError> {
-
+    //Extension(ref templates): Extension<Tera>,
+    //templates: Extension<Arc<Tera>>,
+    templates: Extension<Tera>,
+    //Extension(ref pool): Extension<PgPool>,
+) -> Result<Html<String>, AppError> {
     //let genres = list_genres(pool).await?;
     let genres = get_static_vec_genres();
 
@@ -152,8 +149,7 @@ pub async fn find_genre_by_name_hdl(
     Extension(ref templates): Extension<Tera>,
     Extension(ref pool): Extension<PgPool>,
     form: Form<Demande>,
-)->  Result<Html<String>, AppError> {
-
+) -> Result<Html<String>, AppError> {
     let demande = form.0;
     tracing::debug!("name : {:?}", demande);
 
