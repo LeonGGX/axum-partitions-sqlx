@@ -9,14 +9,18 @@ author = "LeonGGX"
 
 [dependencies]
 # Primary crates
-axum = { version = "0.5.13", features = ["headers", "macros"]}
+
+#axum = { version = "0.6.0-rc.2", features = ["headers", "macros"]}
+axum = { version = "0.5.16", features = ["headers", "macros"]}
+
 tokio = { version = "1.0", features = ["full"] }
 #sqlx = { version = "0.6", features = ["runtime-tokio-native-tls" , "postgres", "uuid"] }
 sqlx = { version = "0.6", features = ["runtime-tokio-rustls" , "postgres", "uuid"] }
 
 # Important secondary crates
 argon2 = "0.4.1"
-rand = "0.8.5"
+#rand = "0.8.5"
+rand = {version = "0.8", features = ["min_const_gen"]}
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version ="1.1.2", features = ["serde", "v4"] }
@@ -41,10 +45,23 @@ tower-cookies = { version = "0.6.0", features = ["axum-core"]}
 tower-http = { version = "0.2", features = ["fs", "add-extension", "trace"] }
 anyhow = "1.0.53"
 dotenvy = "0.15.1"
-axum-debug = "0.3.2"
 
-axum-macros = "0.2.0"
-axum-flash = "0.4.0"
-axum-extra = {version ="0.3.1", features = ["spa"]}
-rand_core = "0.6.3"
 rand_chacha = "0.3.1"
+rand_core = { version = "0.6", features = ["std"] }
+
+
+# axum dedicated crates
+axum-debug = "0.3.2"
+axum-macros = "0.2.0"
+axum-flash = "0.5.0"
+axum-extra = {version ="0.3.1", features = ["spa"]}
+#axum-login = { version="0.2.0", features = ["postgres", "sqlx"]}
+
+axum-sessions = "0.3.1"
+async-sqlx-session = {version = "0.4.0", features = ["pg"]}
+async-session = "3.0.0"
+pbkdf2 = "0.11.0"
+
+axum_database_sessions = "4.1.0"
+hyper = "0.14.20"
+
