@@ -1,52 +1,42 @@
 //! src/main.rs
 
-mod flash;
-mod models;
-mod error;
-mod handlers;
 mod auth;
-mod router;
 mod db;
-//mod my_askama;
+mod error;
+mod flash;
+mod handlers;
+mod models;
+mod router;
 mod globals;
+mod utils;
 
+use std::str::FromStr;
+use std::{env, net::SocketAddr};
 
-use axum::{
-    http::{StatusCode,},
-    Extension,
-};
+use axum::{http::StatusCode, Extension};
 use axum_flash::Key;
 
-//use axum_database_sessions::{AxumSession, AxumSessionConfig, AxumSessionLayer, AxumDatabasePool};
-//use axum_sessions_auth::{AuthSession, AuthSessionLayer, Authentication};
+use axum_database_sessions::{ AxumSessionLayer, };
 
-use std::{env, net::SocketAddr};
-use std::str::FromStr;
-use std::sync::Arc;
-use rand_chacha::ChaCha8Rng;
-use rand_core::{OsRng, RngCore, SeedableRng};
-
-use tera::Tera;
-use tokio::sync::Mutex;
-
-use tower::{ServiceBuilder,};
-use tower_cookies::{CookieManagerLayer,};
-use tower_http::{trace::TraceLayer, };
+use tower::ServiceBuilder;
+use tower_cookies::CookieManagerLayer;
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use tera::Tera;
+
+use crate::auth::session::{new_ascd_creation_sqlx_session, new_axum_sqlx_session};
+use crate::db::connect::create_pg_pool;
 use crate::error::AppError;
 use crate::handlers::helpers_hdl::*;
 use crate::router::router;
-use crate::db::connect::create_pg_pool;
 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "axum_jwt=debug,tower_http=info".into()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "axum_jwt=debug,tower_http=info".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -56,7 +46,6 @@ async fn main() -> anyhow::Result<()> {
     let host = env::var("HOST").expect("HOST is not set in .env file");
     let port = env::var("PORT").expect("PORT is not set in .env file");
     let server_url = format!("{}:{}", host, port);
-
 
     // ici utilisation de sqlx
     let pool = create_pg_pool(&db_url).await?;
@@ -71,10 +60,26 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // axum-flash
+    // vient de tower_cookies::Key
     let key = Key::generate();
 
-    // pour les sessions
-    let random = rand_chacha::ChaCha8Rng::seed_from_u64(OsRng.next_u64());
+    // Ascending session
+    let session_store = new_ascd_creation_sqlx_session(&pool).await;
+
+    match session_store {
+        Ok(ref s) => {
+            tracing::info!("session créée");
+            let count = s.clone().count().await.unwrap();
+            let client = s.client.clone().unwrap();
+            tracing::info!("client de sessions : {:?}", &client);
+            tracing::info!("nombre de sessions : {}", count);
+        }
+        Err(err) => {
+            tracing::error!("erreur : {:?}", err);
+            panic!("erreur dans session");
+        }
+    }
+    let session = session_store.unwrap();
 
     let app =
         // fonction qui vient de 'router.rs' et qui construit toutes les routes
@@ -85,9 +90,8 @@ async fn main() -> anyhow::Result<()> {
                     .layer(CookieManagerLayer::new())
                     .layer(Extension(pool))
                     .layer(Extension(templates)))
-                    // axum-flash
                     .layer(axum_flash::layer(key).with_cookie_manager())
-                    .layer(Extension(Arc::new(Mutex::new(random))));
+                    .layer(AxumSessionLayer::new(session));
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
     tracing::debug!("listening on {}", addr);
@@ -99,10 +103,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-
-
-
-
-
-

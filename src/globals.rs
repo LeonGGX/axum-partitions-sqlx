@@ -7,13 +7,9 @@
 // la page d'impression, d'où la nécessité d'être des variables globales
 // *******************************************************************************
 
+use crate::models::{genre::Genre, musician::Person, partition::ShowPartition};
 use lazy_static::lazy_static;
 use std::sync::Mutex;
-use crate::models::{
-    musician::Person,
-    genre::Genre,
-    partition::{Partition, ShowPartition,},
-};
 
 lazy_static! {
     static ref VEC_PERSONS: Mutex<Vec<Person>> = Mutex::new(Vec::new());
@@ -37,7 +33,6 @@ pub fn set_static_vec_genres(genres: Vec<Genre>) {
     *VEC_GENRES.lock().unwrap() = genres;
 }
 
-
 pub fn get_static_vec_partitions() -> Vec<ShowPartition> {
     VEC_SHOWPARTITIONS.lock().unwrap().clone()
 }
@@ -45,4 +40,3 @@ pub fn get_static_vec_partitions() -> Vec<ShowPartition> {
 pub fn set_static_vec_partitions(partitions: Vec<ShowPartition>) {
     *VEC_SHOWPARTITIONS.lock().unwrap() = partitions;
 }
-

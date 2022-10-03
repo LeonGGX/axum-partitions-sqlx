@@ -14,13 +14,8 @@ use axum::{
 };
 
 use crate::handlers::{
-    partitions_hdl::*,
-    musicians_hdl::*,
-    genres_hdl::*,
-    helpers_hdl::*,
-    login_hdl::*,
-    sign_up_hdl::*,
-    list_users_hdl::*,
+    genres_hdl::*, helpers_hdl::*, list_users_hdl::*, login_hdl::*, musicians_hdl::*,
+    partitions_hdl::*, sign_up_hdl::*,
 };
 
 ///

@@ -1,73 +1,31 @@
 // src/error.rs
 
 use axum::http::header::WWW_AUTHENTICATE;
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
-use axum::response::{IntoResponse,};
+use axum::http::{HeaderMap, HeaderValue, Response, StatusCode};
+use axum::response::IntoResponse;
 use axum::Json;
 
 use thiserror::Error;
 
+use serde_json::json;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use serde_json::{json,};
+use std::error::Error;
+use std::fmt::Display;
 
-#[derive(Debug, Error)]
-pub enum MyError {
-    //#[error(transparent)]
-    //BcryptError(#[from] bcrypt::BcryptError),
-    #[error(transparent)]
-    SqlxError(#[from] sqlx::Error),
-    #[error(transparent)]
-    JwtError(#[from] jsonwebtoken::errors::Error),
-    #[error(transparent)]
-    TokioRecvError(#[from] tokio::sync::oneshot::error::RecvError),
-    #[error(transparent)]
-    AxumTypedHeaderError(#[from] axum::extract::rejection::TypedHeaderRejection),
-    #[error(transparent)]
-    AxumExtensionError(#[from] axum::extract::rejection::ExtensionRejection),
-    //#[error(transparent)]
-    //ValidationError(#[from] validator::ValidationErrors),
-    #[error("wrong credentials")]
-    WrongCredentials,
-    #[error("password doesn't match")]
-    WrongPassword,
-    #[error("email is already taken")]
-    DuplicateUserEmail,
-    #[error("name is already taken")]
-    DuplicateUserName,
-    #[error(transparent)]
-    UnexpectedError(#[from] anyhow::Error),
-}
-
-/*
-pub type Result<T> = std::result::Result<T, MyError>;
-pub type ApiError = (StatusCode, Json<Value>);
-
-impl From<MyError> for ApiError {
-    fn from(err: MyError) -> Self {
-        let status = match err {
-            MyError::WrongCredentials => StatusCode::UNAUTHORIZED,
-            //MyError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        let payload = json!({"message": err.to_string()});
-        (status, Json(payload))
-    }
-}
-*/
 
 #[derive(Debug, Error)]
 pub enum AppError {
     /// Return `401 Unauthorized`
-    #[error("authentication required")]
+    #[error("Il faut s'identifier")]
     Unauthorized,
 
     /// Return `403 Forbidden`
-    #[error("user may not perform that action")]
+    #[error("l'Utilisateur ne peut faire cette action")]
     Forbidden,
 
     /// Return `404 Not Found`
-    #[error("request path not found")]
+    #[error("Page non trouvée")]
     NotFound,
 
     #[error("error in the request body")]
@@ -76,7 +34,7 @@ pub enum AppError {
     },
 
     #[error(transparent)]
-    Sqlx( #[from] sqlx::Error),
+    Sqlx(#[from] sqlx::Error),
 
     /// Via the generated `From<anyhow::Error> for Error` impl, this allows the
     /// use of `?` in handler functions to automatically convert `anyhow::Error` into a response.
@@ -107,23 +65,22 @@ pub enum AppError {
 
     #[error("invalid auth header")]
     InvalidAuthHeaderError,
-/*
-    #[error("no permission")]
-    NoPermissionError,
-*/
+    /*
+        #[error("no permission")]
+        NoPermissionError,
+    */
     #[error("Validations error")]
     ValidationError,
-/*
-    #[error(transparent)]
-    UnexpectedError(#[from] anyhow::Error),
+    /*
+        #[error(transparent)]
+        UnexpectedError(#[from] anyhow::Error),
 
-    #[error("User already exists")]
-    UserExists,
-*/
+        #[error("User already exists")]
+        UserExists,
+    */
 }
 
 impl AppError {
-
     /// Convenient constructor for `Error::UnprocessableEntity`.
     ///
     /// Multiple for the same key are collected into a list for that key.
@@ -132,9 +89,9 @@ impl AppError {
     ///
     #[allow(dead_code)]
     pub fn unprocessable_entity<K, V>(errors: impl IntoIterator<Item = (K, V)>) -> Self
-        where
-            K: Into<Cow<'static, str>>,
-            V: Into<Cow<'static, str>>,
+    where
+        K: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
     {
         let mut error_map = HashMap::new();
 
@@ -147,7 +104,6 @@ impl AppError {
 
         Self::UnprocessableEntity { errors: error_map }
     }
-
 
     pub fn status_code(&self) -> StatusCode {
         match self {
@@ -213,12 +169,9 @@ impl IntoResponse for AppError {
                 // so that this gets linked to the HTTP request by `TraceLayer`.
                 tracing::error!("SQLx error: {:?}", e);
                 let body = Json(json!({
-                        "message :" : e.to_string()
-                    }));
-                return(
-                    self.status_code(),
-                    body
-                ).into_response();
+                    "message :" : e.to_string()
+                }));
+                return (self.status_code(), body).into_response();
             }
 
             Self::Anyhow(ref e) => {
@@ -229,31 +182,24 @@ impl IntoResponse for AppError {
                     self.status_code(),
                     Json(json!({
                         "message :" : e.to_string()
-                    }))
-                ).into_response()
+                    })),
+                )
+                    .into_response();
             }
 
             Self::Tera(ref e) => {
                 tracing::error!("Tera error : {:?}", e);
-                let body =  Json(json!({
-                        "message :" : e.to_string()
-                    }));
-                return (
-                    self.status_code(),
-                    body
-                ).into_response()
+                let body = Json(json!({
+                    "message :" : e.to_string()
+                }));
+                return (self.status_code(), body).into_response();
             }
 
             Self::JWTTokenCreationError(ref e) => {
                 tracing::error!("Token creation error : {:?}", e);
                 let error_json = json!({"message" : e.to_string()});
-                let body = Json(json!(
-                    error_json
-                ));
-                return (
-                    self.status_code(),
-                    body
-                ).into_response()
+                let body = Json(json!(error_json));
+                return (self.status_code(), body).into_response();
             }
 
             // Other errors get mapped normally.
@@ -262,23 +208,64 @@ impl IntoResponse for AppError {
         (self.status_code(), self.to_string()).into_response()
     }
 }
-/*
-/// This makes it possible to use `?` to automatically convert a `UserRepoError`
-/// into an `AppError`.
-impl From<UserRepoError> for AppError {
-    fn from(inner: UserRepoError) -> Self {
-        AppError::UserRepo(inner)
+
+
+#[derive(Debug)]
+pub enum SignupError {
+    UsernameExists,
+    InvalidUsername,
+    PasswordsDoNotMatch,
+    MissingPassword,
+    MissingUserName,
+    MissingPwConfirm,
+    MissingRole,
+    InvalidPassword,
+    InternalError,
+}
+
+impl Display for SignupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SignupError::InvalidUsername => f.write_str("Nom d'utilisateur incorrect"),
+            SignupError::UsernameExists => f.write_str("Cet Utilisateur existe déjà"),
+            SignupError::PasswordsDoNotMatch => f.write_str("Mot de passe non confirmé"),
+            SignupError::MissingPassword => f.write_str("Il faut entrer un mot de passe"),
+            SignupError::MissingUserName => f.write_str("Il faut entrer un nom d'utilisateur"),
+            SignupError::MissingPwConfirm => f.write_str("Il faut confirmer le mot de passe"),
+            SignupError::MissingRole => f.write_str("Il faut entrer un rôle"),
+            SignupError::InvalidPassword => f.write_str("Mot de passe incorrect"),
+            SignupError::InternalError => f.write_str("Erreur Serveur"),
+        }
     }
 }
-*/
-/*
-impl IntoResponse for AuthError {
-    fn into_response(self) -> Response {
+
+impl Error for SignupError {}
+
+impl IntoResponse for SignupError {
+    fn into_response(self) -> axum::response::Response {
         let (status, error_message) = match self {
-            AuthError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
-            AuthError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
-            AuthError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
-            AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
+            SignupError::InvalidUsername => {
+                (StatusCode::BAD_REQUEST, "Nom d'utilisateur incorrect")
+            }
+            SignupError::UsernameExists => {
+                (StatusCode::UNAUTHORIZED, "Cet Utilisateur existe déjà")
+            }
+            SignupError::PasswordsDoNotMatch => {
+                (StatusCode::UNAUTHORIZED, "Mot de passe non confirmé")
+            }
+            SignupError::MissingPassword => {
+                (StatusCode::BAD_REQUEST, "Il faut entrer un mot de passe")
+            }
+            SignupError::MissingUserName => (
+                StatusCode::BAD_REQUEST,
+                "Il faut entrer un nom d'utilisateur",
+            ),
+            SignupError::MissingPwConfirm => {
+                (StatusCode::BAD_REQUEST, "Il faut confirmer le mot de passe")
+            }
+            SignupError::MissingRole => (StatusCode::BAD_REQUEST, "Il faut entrer un rôle"),
+            SignupError::InvalidPassword => (StatusCode::UNAUTHORIZED, "Mot de passe incorrect"),
+            SignupError::InternalError => (StatusCode::INTERNAL_SERVER_ERROR, "Erreur Serveur"),
         };
         let body = Json(json!({
             "error": error_message,
@@ -286,35 +273,24 @@ impl IntoResponse for AuthError {
         (status, body).into_response()
     }
 }
-*/
-/*
-pub trait ResultExt<T> {
-    /// If `self` contains a SQLx database constraint error with the given name,
-    /// transform the error.
-    ///
-    /// Otherwise, the result is passed through unchanged.
-    fn on_constraint(
-        self,
-        name: &str,
-        f: impl FnOnce(Box<dyn DatabaseError>) -> AppError,
-    ) -> Result<T, AppError>;
+
+#[derive(Debug)]
+pub(crate) enum LoginError {
+    MissingPassword,
+    MissingUserName,
+    UserDoesNotExist,
+    WrongPassword,
 }
 
-impl<T, E> ResultExt<T> for Result<T, E>
-    where
-        E: Into<AppError>,
-{
-    fn on_constraint(
-        self,
-        name: &str,
-        map_err: impl FnOnce(Box<dyn DatabaseError>) -> AppError,
-    ) -> Result<T, AppError> {
-        self.map_err(|e| match e.into() {
-            AppError::Sqlx(sqlx::Error::Database(dbe)) if dbe.constraint() == Some(name) => {
-                map_err(dbe)
-            }
-            e => e,
-        })
+impl Display for LoginError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoginError::UserDoesNotExist => f.write_str("Cet Utilisateur n'existe pas"),
+            LoginError::MissingPassword => f.write_str("Il faut entrer un Mot de Passe"),
+            LoginError::MissingUserName => f.write_str("Il faut entrer le Nom d'Utilisateur"),
+            LoginError::WrongPassword => f.write_str("Mot de passe incorrect"),
+        }
     }
 }
-*/
+
+impl Error for LoginError {}
