@@ -1,6 +1,6 @@
 //! src/models/mod.rs
 
-pub mod user;
-pub mod musician;
 pub mod genre;
+pub mod musician;
 pub mod partition;
+pub mod user;

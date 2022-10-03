@@ -3,9 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-#[derive(
-Debug, Clone, Deserialize, Serialize, FromRow,
-)]
+#[derive(Debug, Clone, Deserialize, Serialize, FromRow)]
 pub struct Partition {
     #[serde(skip_deserializing)]
     pub id: Option<i32>,

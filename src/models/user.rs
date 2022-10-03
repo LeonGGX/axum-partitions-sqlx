@@ -1,7 +1,9 @@
 //! src/models/user.rs
 //!
+
+//use axum_login::AuthUser;
+use serde::Serialize;
 use uuid::Uuid;
-use serde::{Serialize,};
 //use sha3::digest::typenum::private::Trim;
 use sqlx::FromRow;
 use unicode_segmentation::UnicodeSegmentation;
@@ -9,9 +11,9 @@ use unicode_segmentation::UnicodeSegmentation;
 ///
 /// User
 /// struct to handle users
-/// fields : user_id, user_name, password_hash, role
+/// fields : id, name, password_hash, role
 ///
-#[derive(Debug, Clone, Serialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Default, FromRow)]
 pub struct User {
     pub id: Uuid,
     pub name: String,
@@ -19,14 +21,25 @@ pub struct User {
     pub role: String,
 }
 
+/*
+impl AuthUser for User {
+    fn get_id(&self) -> String {
+        format!("{}", self.id)
+    }
+
+    fn get_password_hash(&self) -> String {
+        self.password_hash.clone()
+    }
+}
+*/
 ///
 /// NewUser
 ///
 /// Struct to handle new user
-/// Uses UserName to protect user_name integrity
+/// Uses NewUserName to protect name integrity
 /// in struct NewUser
 ///
-#[derive(Debug,)]
+#[derive(Debug)]
 pub struct NewUser {
     pub name: NewUserName,
     pub password: String,
@@ -38,7 +51,7 @@ pub struct NewUser {
 ///
 /// struct to protect user_name integrity in struct User
 ///
-#[derive(Debug,)]
+#[derive(Debug)]
 pub struct NewUserName(String);
 
 impl AsRef<str> for NewUserName {
@@ -51,6 +64,7 @@ impl NewUserName {
     /// Returns an instance of `UserName` if the input satisfies all
     /// our validation constraints on subscriber names.
     /// It panics otherwise.
+    #[allow(dead_code)]
     pub fn parse(s: String) -> Result<NewUserName, String> {
         // `.trim()` returns a view over the input `s` without trailing
         // whitespace-like characters.
